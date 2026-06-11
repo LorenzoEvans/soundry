@@ -1,48 +1,115 @@
 use crate::parser::parse_key_value;
+use crate::refinements::*;
+use crate::opcode_mapping::{Opcode, map_opcode};
 use nom::{bytes::complete::tag, character::complete::space0, multi::many0, IResult};
 use std::collections::HashMap;
-#[derive(Debug, PartialEq, Clone)]
+use refinement::Refinement;
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Region {
-    low_velocity: u32,
-    high_velocity: u32,
-    volume: f32,
-    region_label: String,
-    sample: (String, String),
-    offset: u32,
-    parameters: HashMap<String, String>,
+    pub lo_vel: Option<RangeZeroToOneTwentySeven>,
+    pub hi_vel: Option<RangeZeroToOneTwentySeven>,
+    pub lo_key: Option<RangeZeroToOneTwentySeven>,
+    pub hi_key: Option<RangeZeroToOneTwentySeven>,
+    pub key: Option<RangeZeroToOneTwentySeven>,
+    pub volume: Option<f32>,
+    pub region_label: Option<String>,
+    pub sample: Option<String>,
+    pub offset: Option<u32>,
+    pub loop_mode: Option<String>,
+    pub trigger: Option<String>,
+    pub typed_opcodes: Vec<Opcode>,
+    pub parameters: HashMap<String, String>,
 }
 
 pub struct SFZFile {
-    elements: Vec<Region>,
+    pub elements: Vec<Region>,
 }
 
 pub fn parse_region(sfz_source: &str) -> IResult<&str, Region> {
     let (remaining, _) = tag("<region>")(sfz_source)?;
-    let (remaining, _) = space0(remaining)?;
-    let (remaining, params) = nom::multi::many0(parse_key_value)(remaining)?;
+    parse_region_no_tag(remaining)
+}
 
-    for i in &params {
-        println!("i is: {:?}", *i);
+pub fn parse_region_no_tag(sfz_source: &str) -> IResult<&str, Region> {
+    let (remaining, _) = space0(sfz_source)?;
+    
+    let mut current_input = remaining;
+    let mut params = Vec::new();
+    
+    while !current_input.is_empty() {
+        let (rem, _) = nom::character::complete::multispace0(current_input)?;
+        if rem.starts_with("<") || rem.starts_with("#") {
+            break;
+        }
+        if let Ok((rem_kv, kv)) = parse_key_value(rem) {
+            params.push(kv);
+            current_input = rem_kv;
+        } else {
+            break;
+        }
     }
 
+    let mut region = Region::default();
     let mut parameters = HashMap::new();
 
     for (key, value) in params {
-        // match the key, then match the value if it
-        // satisfies the refinement predicate, then move on to
-        // the line below.
-        parameters.insert(key.to_string(), value.to_string());
+        if let Some(opcode) = map_opcode(key, value) {
+            region.typed_opcodes.push(opcode);
+        }
+        
+        match key {
+            "lovel" => {
+                if let Ok(val) = value.parse::<u8>() {
+                    region.lo_vel = RangeZeroToOneTwentySeven::new(val).ok();
+                }
+            }
+            "hivel" => {
+                if let Ok(val) = value.parse::<u8>() {
+                    region.hi_vel = RangeZeroToOneTwentySeven::new(val).ok();
+                }
+            }
+            "lokey" => {
+                if let Ok(val) = value.parse::<u8>() {
+                    region.lo_key = RangeZeroToOneTwentySeven::new(val).ok();
+                }
+            }
+            "hikey" => {
+                if let Ok(val) = value.parse::<u8>() {
+                    region.hi_key = RangeZeroToOneTwentySeven::new(val).ok();
+                }
+            }
+            "key" => {
+                if let Ok(val) = value.parse::<u8>() {
+                    region.key = RangeZeroToOneTwentySeven::new(val).ok();
+                }
+            }
+            "volume" => {
+                region.volume = value.parse::<f32>().ok();
+            }
+            "label" => {
+                region.region_label = Some(value.to_string());
+            }
+            "sample" => {
+                region.sample = Some(value.to_string());
+            }
+            "offset" => {
+                region.offset = value.parse::<u32>().ok();
+            }
+            "loop_mode" => {
+                region.loop_mode = Some(value.to_string());
+            }
+            "trigger" => {
+                region.trigger = Some(value.to_string());
+            }
+            _ => {
+                parameters.insert(key.to_string(), value.to_string());
+            }
+        }
     }
+    region.parameters = parameters;
 
-    Ok((sfz_source, Region { 
-        parameters,
-        low_velocity: 0,
-        high_velocity: 0,
-        volume: 0f32,
-        region_label: String::new(),
-        sample: (String::new(), String::new()),
-        offset: 0
-    }))
+    Ok((current_input, region))
 }
 
 pub fn parse_sfz(sfz_source: &str) -> IResult<&str, SFZFile> {

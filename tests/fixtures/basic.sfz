@@ -1,0 +1,15 @@
+<control>
+default_path=Samples/
+#define $EXT wav
+
+<global>
+volume=-3
+
+<group>
+lovel=0
+hivel=127
+
+<region>
+sample=kick.$EXT
+key=36
+custom_opcode=kept

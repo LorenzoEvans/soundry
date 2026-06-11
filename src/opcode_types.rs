@@ -22,9 +22,10 @@
 // lo -> Low
 // hi -> High
 //
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InputControl {}
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum Triggers {
     Trigger(String), // Can be attack, release, first or legato.
     OnHighCC(u8),
@@ -40,6 +41,8 @@ pub enum Triggers {
     StopLowCC(u32),
     StopLowHdCC(f32),
 }
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum SamplePlayback {
     Count(u32),
     DelayBeatsCurve(u8),
@@ -83,6 +86,7 @@ pub enum SamplePlayback {
     WaveGuide(String),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum InstrumentSettings {
     Mod(String),
     Default(String),
@@ -105,6 +109,7 @@ pub enum InstrumentSettings {
     SwOctaveOffset(i8),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum VoiceLifecycle {
     Group(i32),
     NotePolyphony(u32),
@@ -120,6 +125,7 @@ pub enum VoiceLifecycle {
     RtDead(String),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum KeyMapping {
     HiKey(u8),
     HiVel(u8),
@@ -128,6 +134,7 @@ pub enum KeyMapping {
     LoKey(u8),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum MidiConditions {
     HighBend(i16),
     HighCC(u8),
@@ -160,6 +167,7 @@ pub enum MidiConditions {
     VarNNOnCC(f32),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum InternalConditions {
     HighChanAft(u8),
     HighPolyAft(u8),
@@ -174,7 +182,8 @@ pub enum InternalConditions {
     SeqLength(u8),
     SeqPosition(u8),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum BusOption {
     Main,
     Aux1,
@@ -191,7 +200,8 @@ pub enum BusOption {
     Fx4,
     Midi,
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum SamplePlayerParameter {
     Delay(f32),
     DelayRandom(f32),
@@ -202,7 +212,8 @@ pub enum SamplePlayerParameter {
     SyncBeats(f32),
     SyncOffset(f32),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum PitchParameter {
     Transpose(u8),
     Tune(u8),
@@ -214,7 +225,8 @@ pub enum PitchParameter {
     BendDown(u16),
     BendStep(u16),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum PitchEGParameter {
     Delay(f32),
     Start(f32),
@@ -232,8 +244,8 @@ pub enum PitchEGParameter {
     Vel2Release(f32),
     Vel2Depth(u32),
 }
-#[derive(Clone, Debug)]
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum PitchLFOParameter {
     Delay(f32),
     Fade(f32),
@@ -246,7 +258,8 @@ pub enum PitchLFOParameter {
     FreqChanAft(f32),
     FreqPolyAft(f32),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum FilterParameter {
     FilType(String),
     Cutoff(f32),
@@ -259,8 +272,8 @@ pub enum FilterParameter {
     VelTrack(u16),
     Random(u16),
 }
-#[derive(Clone, Debug)]
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum FilterEGParameter {
     Delay(f32),
     Start(f32),
@@ -278,7 +291,8 @@ pub enum FilterEGParameter {
     Vel2Release(f32),
     Vel2Depth(u16),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum FilterLFOParameter {
     Delay(f32),
     Fade(f32),
@@ -291,7 +305,8 @@ pub enum FilterLFOParameter {
     FreqChanAft(f32),
     FreqPolyAft(f32),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum AmplifierParameter {
     AmpKeyCenter(u8),
     AmpKeyTrack(f32),
@@ -365,7 +380,8 @@ pub enum AmplifierParameter {
     CfOutHighCC(u8),
     CfCCCurve(String),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum AmplifierEGParameter {
     Delay(f32),
     Start(f32),
@@ -388,7 +404,8 @@ pub enum AmplifierEGParameter {
     SustainCC(f32),
     ReleaseCC(f32),
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum AmplifierLFOParameter {
     Delay(f32),
     Fade(f32),
@@ -401,8 +418,8 @@ pub enum AmplifierLFOParameter {
     FreqChanAft(f32),
     FreqPolyAft(f32),
 }
-#[derive(Clone, Debug)]
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum EqualizerParameter {
     Eq1Freq(f32),
     Eq2Freq(f32),
@@ -430,7 +447,7 @@ pub enum EqualizerParameter {
     Eq3Vel2Gain(f32),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AriaEffect {
     Limiter,
     Overdrive,
@@ -447,7 +464,8 @@ pub enum AriaEffect {
     SubSynth,
     RezFilter,
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum SfzEffect {
     Apan,
     Comp,
@@ -465,7 +483,8 @@ pub enum SfzEffect {
     Strings,
     Tdfir,
 }
-#[derive(Clone, Debug)]
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum EffectType {
     // These variants are going to have to be
     // refactored as this is a confusing naming.
@@ -478,7 +497,7 @@ pub enum EffectType {
 // Amplifier
 // Filter
 // EQ
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PerformanceParameter {
     SamplePlayer(SamplePlayerParameter),
     Pitch(PitchParameter),
@@ -493,7 +512,8 @@ pub enum PerformanceParameter {
     Equalizer(EqualizerParameter),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct DefineDirective {
-    define_name: String,
-    define_value: String,
+    pub define_name: String,
+    pub define_value: String,
 }

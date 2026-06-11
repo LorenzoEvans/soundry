@@ -1,173 +1,181 @@
 # Soundry
 
-Soundry is an experimental parser for the SFZ file format, written in Rust that intends to be capable of handling both SFZ versions. As well, it intends to implement the full set of opcodes for various headers, and ideally, parse SFZ files programmatically depending on the tools that would use the parser. For example, Meadlowlark is a Rust based DAW, for which someone could use Soundry to develop a synthesizer plugin that provides instruments, synths, and the like.
+Soundry is an experimental Rust parser library for the SFZ instrument format.
+The current v0.1 scope focuses on a reliable parser architecture: preserve raw
+SFZ structure, resolve practical inheritance, validate a useful typed opcode
+subset, and keep unsupported data available for downstream tools.
 
-## Features
+Soundry uses a three-layer model:
 
-- Efficient Parsing: Utilizes the nom crate for fast and accurate parsing of SFZ files.
-- Value Refinement: Uses the refinement crate to guarantee that all opcode values are within the ranges defined in the specification(s).
-- Flexibility: Allows for handling both SFZ versions and whatever set of headers/opcodes are supported by a given player.
+- Raw parse layer: headers, directives, and opcode key/value pairs are preserved.
+- Resolution layer: `#define`, optional `#include`, and region inheritance are applied.
+- Typed validation layer: known core opcodes are converted to Rust enum variants and invalid values produce diagnostics.
 
-## Getting Started
+## Current Scope
 
-### Installing
+Soundry currently supports these headers:
 
-Bringing Soundry into your project is as simple as adding the following to your `Cargo.toml` file:
+- `<control>`
+- `<global>`
+- `<master>`
+- `<group>`
+- `<region>`
+- `<curve>`
+- `<effect>`
+- `<midi>`
+- Unknown headers, preserved as `HeaderKind::Unknown`
+
+The typed v0.1 opcode subset includes:
+
+- Sample/file: `sample`
+- Key and velocity: `key`, `lokey`, `hikey`, `lovel`, `hivel`, `pitch_keycenter`
+- Playback and loop points: `offset`, `end`, `loop_mode`, `loop_start`, `loop_end`
+- Triggering and grouping: `trigger`, `group`, `off_by`, `off_mode`, `seq_position`, `seq_length`
+- Amplifier/mix: `volume`, `pan`, `amp_veltrack`
+- Control: `default_path`, `note_offset`, `octave_offset`, `label_ccN`, `label_cc$VAR`, `set_ccN`
+- Curves: `curve_index`, `v000` through `v127`
+
+All other opcodes remain available as raw opcode data. Unknown opcodes are not
+errors.
+
+## Non-Goals
+
+Soundry v0.1 does not implement audio playback, the full SFZ v1/v2 opcode
+universe, or player-specific behavior. It also does not reject an entire SFZ
+document because one known opcode has an invalid value; invalid known values are
+reported through diagnostics.
+
+## Usage
+
+Add Soundry to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 soundry = "0.1.0"
 ```
 
-Alternatively, if you'd like to build it from source, run the following in the directory of your choosing:
-
-```bash
-git clone https://github.com/arcnemesys/soundry.git
-cd soundry && cargo
-
-```
-
-
-### Usage
-
-A simple placeholder example of using Soundry is given below..
+Parse a document:
 
 ```rust
-use soundry::control::parse_control_header;
+use soundry::{parse_sfz, Opcode};
 
-fn main() {
+let sfz = r#"
+<control>
+default_path=Samples/
+#define $EXT wav
 
-  let control_header = r#"<control>
-    default_path=Samples\
-    #define $EXT wav
-    #include \"data\control.sfz\"
-    #include \"data\multiout.sfz\"
-    #include \"data\global.sfz\"
-    #include \"data\kick.sfz\"
-    #include \"data\snare.sfz\"
-    #include \"data\tom1.sfz\"
-    #include \"data\tom2.sfz\"
-    #include \"data\hihat.sfz\"
-    #include \"data\ride.sfz\"
-    #include \"data\crash.sfz\"#;
+<global>
+volume=-3
 
-    match parse_control_header(control_header) {
-        Ok((_, control)) => {
-            let expected_control_header = Control { 
-              header_type: Control, 
-              define_directives: {"EXT": "wav"},
-              include_directives: [
-                "data\\control.sfz",
-                "data\\multiout.sfz",
-                "data\\global.sfz",
-                "data\\kick.sfz",
-                "data\\snare.sfz",
-                "data\\tom1.sfz",
-                "data\\tom2.sfz",
-                "data\\hihat.sfz",
-                "data\\ride.sfz",
-                "data\\crash.sfz"
-              ],
-              default_path: "Samples\\", 
-              note_offset: 0, 
-              octave_offset: 0, 
-              label_ccn: [], 
-              set_ccn: [] 
-              };
-            assert_eq!(control, expected_control_header);
-            println!("Successfully parsed control header: {:?}", control);
-        },
-        Err(e) => eprintln!("Failed to parse SFZ control header: {}", e),
+<group>
+lovel=0
+hivel=127
+
+<region>
+sample=kick.$EXT
+key=36
+custom_opcode=preserved
+"#;
+
+let document = parse_sfz(sfz)?;
+
+assert_eq!(document.regions.len(), 1);
+assert!(document.regions[0]
+    .typed_opcodes
+    .contains(&Opcode::Sample("kick.wav".into())));
+assert!(document.regions[0]
+    .unknown_opcodes
+    .iter()
+    .any(|opcode| opcode.key == "custom_opcode"));
+# Ok::<(), soundry::ParseError>(())
+```
+
+Inspect resolved regions:
+
+```rust
+use soundry::{parse_sfz, Opcode};
+
+let document = parse_sfz(
+    r#"
+<global>
+volume=-3
+<group>
+lovel=10
+<region>
+sample=snare.wav
+key=38
+"#,
+)?;
+
+let region = &document.regions[0];
+assert!(region.typed_opcodes.contains(&Opcode::Volume(-3.0)));
+assert!(region.typed_opcodes.contains(&Opcode::LoVel(10)));
+assert!(region.typed_opcodes.contains(&Opcode::Key(38)));
+# Ok::<(), soundry::ParseError>(())
+```
+
+## Includes and Defines
+
+`#define` directives are applied to later opcode keys and values:
+
+```sfz
+#define $EXT wav
+sample=kick.$EXT
+```
+
+Use `parse_sfz_with_options` and an `IncludeResolver` to load includes. The
+parser does not hardwire filesystem access.
+
+```rust
+use soundry::{parse_sfz_with_options, IncludeError, IncludeResolver, ParseOptions};
+
+struct Resolver;
+
+impl IncludeResolver for Resolver {
+    fn resolve(&self, path: &str) -> Result<String, IncludeError> {
+        match path {
+            "kick.sfz" => Ok("<region>\nsample=kick.wav\nkey=36\n".into()),
+            _ => Err(IncludeError::new("unknown include")),
+        }
     }
 }
 
+let resolver = Resolver;
+let document = parse_sfz_with_options(
+    r#"#include "kick.sfz""#,
+    ParseOptions::with_include_resolver(&resolver),
+)?;
 
+assert_eq!(document.regions.len(), 1);
+# Ok::<(), soundry::ParseError>(())
 ```
 
-### Dependencies
+If no resolver is supplied, include directives are preserved and a warning
+diagnostic is emitted.
 
-  - [Nom](https://github.com/rust-bakery/nom).
-  - [Refinement](https://docs.rs/refinement/latest/refinement/).
+## Diagnostics
 
+Known opcode validation failures are reported as structured diagnostics:
 
-### Acknowledgments
+```rust
+use soundry::{parse_sfz, Severity};
 
-  - Nom author(s)
-  - Refinement authors(s)
-  - Anders Danhielson
+let document = parse_sfz("<region>\nkey=128")?;
+assert_eq!(document.regions[0].diagnostics[0].severity, Severity::Error);
+# Ok::<(), soundry::ParseError>(())
+```
 
-### Inspirations
-- Meadowlark
-- Hound
-- Rodio
-- Dasp
-- Fundsp
-- Glicol
-- Reaper-rs
+## Roadmap
 
-### Reference Material
+- Add more typed SFZ v1/v2 opcode groups.
+- Improve source spans beyond line/column starts.
+- Add filesystem include resolver helpers behind an opt-in API.
+- Expand compatibility fixtures from real-world SFZ libraries.
+- Document exact player-specific differences where Soundry intentionally stays neutral.
 
-- http://drealm.info/sfz/plj-sfz.xhtml
+## Reference Material
 
-- https://sfzformat.com/headers/
-
-- Opcode List: https://www.linuxsampler.org/sfz/
-
-- https://sfzformat.com/legacy/
-
-- SFZ Tutorial/Intro: https://sfzformat.com/tutorials/basics/
-
-- MIDI CC Message List: https://atherproducer.com/online-tools-for-musicians/midi-cc-list/
-
-- https://www.sustainable-music.org/demystifying-sfz-a-guide-to-understanding-the-sfz-format-for-sound-libraries/
-
-- https://github.com/sfz/tests/tree/master
-
-- https://sfzlab.github.io/sfz-website/
-
-- https://edrums.github.io/en/linuxsampler/sfz/#Effects
-
-- https://raw.githubusercontent.com/sfzinstruments/mappings/master/Pettinhouse/Yamaha%209000/Yamaha%209000.sfz
-
-- https://github.com/sfzinstruments/mappings/blob/master/PastToFuture%20Disco%20Drums/Disco%20Drums%20-%20Multiout.sfz
-
-### TODOS
-
-- TODO: Dedupe EG/LFO variants to be defined once and reused.
-
-- TODO [in progress]: Explore refinement types.
-
-- TODO [in progress]: Implement parsing with nom.
-
-- TODO: Add Cakewalk specific codes.
-
-- TODO: Add v2 opcodes for
-  
-  - Sample Playback
-  
-  - Voice LifeCycle
-  
-  - Midi Conditions
-  
-  - Internal Conditions
-  
-  - Triggers
-  
-  - Amplifier
-  
-  - EQ
-  
-  - Filter
-  
-  - Pitch
-  
-  - LFO
-  
-  - Curves
-  
-  - Effects
-  
-  - Loading
-  
-  - Wavetable Oscillator
-- TODO: Figure out how to parse whatever *this* is: label_cc$RELEASE=Release ($RELEASE)
+- <https://sfzformat.com/headers/>
+- <https://sfzformat.com/tutorials/basics/>
+- <https://www.linuxsampler.org/sfz/>
+- <https://github.com/sfz/tests>
